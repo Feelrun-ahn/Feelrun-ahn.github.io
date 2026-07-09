@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "여기에_패키지이름_예: app.eodigaji.twa",
+      "sha256_cert_fingerprints": [
+        "여기에_PWABuilder_또는_Play앱서명_에서_받은_SHA256_지문을_붙여넣으세요"
+      ]
+    }
+  }
+]
