@@ -61,6 +61,8 @@
   }
   /* 입력창은 선택·확대·붙여넣기 가능하게 예외 */
   input, textarea{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+  /* 다크/라이트 토글 시에만 전역 색 전환 애니메이션 (부드럽게) */
+  html.theme-anim *{ transition: background-color .45s ease, color .45s ease, border-color .45s ease, fill .45s ease, box-shadow .45s ease !important; }
   button{ font-family:inherit; cursor:pointer; }
   .hidden{ display:none !important; }
   .theme-toggle{
@@ -773,7 +775,7 @@
       <label style="display:block; font-size:0.8rem; font-weight:700; color:var(--text-soft); margin:24px 0 12px;">아이콘 <span style="font-weight:500; color:var(--faint);">· 이모지나 글자를 직접 입력하세요</span></label>
       <div style="display:flex; align-items:center; gap:14px;">
         <div id="iconPreview" style="width:64px; height:64px; flex:none; border-radius:20px; background:linear-gradient(150deg,var(--accent),var(--accent-2)); display:flex; align-items:center; justify-content:center; font-size:32px; box-shadow:0 8px 18px rgba(91,91,214,0.3);">📍</div>
-        <input id="roomIconInput" type="text" maxlength="8" placeholder="예) 🍕  🎉  🍻  카페" style="flex:1; min-width:0; height:54px; border-radius:18px; border:1px solid var(--border); background:var(--surface); backdrop-filter:blur(var(--blur)); -webkit-backdrop-filter:blur(var(--blur)); padding:0 18px; font-size:1.3rem; color:var(--text); outline:none; text-align:center;">
+        <input id="roomIconInput" type="text" maxlength="8" placeholder="이모지를 압력하세요" style="flex:1; min-width:0; height:54px; border-radius:18px; border:1px solid var(--border); background:var(--surface); backdrop-filter:blur(var(--blur)); -webkit-backdrop-filter:blur(var(--blur)); padding:0 18px; font-size:1.3rem; color:var(--text); outline:none; text-align:center;">
       </div>
       <div class="err" id="createErr" style="margin-top:12px;">모임 이름을 입력해 주세요!</div>
     </div>
@@ -1093,6 +1095,11 @@
         <span class="dr-label" style="flex:1; text-align:left;">도움말 · 사용법</span>
         <span class="dr-chevron">›</span>
       </button>
+      <button class="drawer-item" id="menuPrivacyBtn">
+        <span class="dr-icon">📄</span>
+        <span class="dr-label" style="flex:1; text-align:left;">개인정보 처리방침</span>
+        <span class="dr-chevron">›</span>
+      </button>
     </div>
     <div class="drawer-footer">
       <button class="big-btn ghost" id="menuLogoutBtn" style="color:var(--danger); border-color:var(--danger-soft);">로그아웃</button>
@@ -1343,7 +1350,14 @@ function applyTheme(t){
   try{ localStorage.setItem(THEME_KEY, t); }catch(e){}
   updateThemeIcons();
 }
-function toggleTheme(){ applyTheme(getTheme()==='dark' ? 'light' : 'dark'); }
+let _themeAnimT = null;
+function toggleTheme(){
+  // 전환하는 동안만 전역 색 전환 애니메이션을 켜서 부드럽게
+  document.documentElement.classList.add('theme-anim');
+  applyTheme(getTheme()==='dark' ? 'light' : 'dark');
+  clearTimeout(_themeAnimT);
+  _themeAnimT = setTimeout(()=> document.documentElement.classList.remove('theme-anim'), 480);
+}
 
 /* ================= 계정 시스템 (ID/비밀번호) =================
    참고: 이메일 인증 서버가 없어서 "완전한" 보안은 아니야.
@@ -2895,6 +2909,7 @@ $('confirmCancel').addEventListener('click', closeConfirm);
 $('confirmOverlay').addEventListener('click', (e)=>{ if(e.target.id==='confirmOverlay') closeConfirm(); });
 $('confirmOk').addEventListener('click', ()=>{ const cb=_confirmCb; closeConfirm(); if(cb) cb(); });
 $('menuHelpBtn').addEventListener('click', ()=>{ closeAccountMenu(); $('helpOverlay').classList.add('show'); });
+$('menuPrivacyBtn').addEventListener('click', ()=>{ closeAccountMenu(); window.open('privacy.html', '_blank'); });
 $('helpClose').addEventListener('click', ()=> $('helpOverlay').classList.remove('show'));
 $('helpOverlay').addEventListener('click', (e)=>{ if(e.target.id==='helpOverlay') $('helpOverlay').classList.remove('show'); });
 
