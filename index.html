@@ -1255,11 +1255,50 @@ function saveMyRooms(list){
   try{ localStorage.setItem(roomsKey(), JSON.stringify(list)); }catch(e){}
 }
 function rememberRoom(code, name, roomName, emoji){
+  const savedAt = Date.now();
   const list = getMyRooms().filter(r=> r.code !== code);
-  list.unshift({ code, name, roomName: roomName||'', emoji: emoji||'📍', savedAt: Date.now() });
+  list.unshift({ code, name, roomName: roomName||'', emoji: emoji||'📍', savedAt });
   saveMyRooms(list.slice(0, 30));
+  // 계정에도 저장 → 다른 기기에서 로그인해도 내 모임이 뜸
+  if(fbReady && myId){
+    try{ set(ref(db, 'users/'+safeKey(myId)+'/rooms/'+code), { name:name||'', roomName:roomName||'', emoji:emoji||'📍', savedAt }); }catch(e){}
+  }
 }
-function forgetRoom(code){ saveMyRooms(getMyRooms().filter(r=> r.code !== code)); }
+function forgetRoom(code){
+  saveMyRooms(getMyRooms().filter(r=> r.code !== code));
+  if(fbReady && myId){ try{ remove(ref(db, 'users/'+safeKey(myId)+'/rooms/'+code)); }catch(e){} }
+}
+/* 로그인/홈 진입 시 계정에 저장된 방 목록을 불러와 로컬과 합침 (기기 간 동기화) */
+async function syncRoomsFromCloud(){
+  if(!myId) return;
+  if(!fbReady){ const ok = await loadFirebase().catch(()=>false); if(!ok) return; }
+  try{
+    const snap = await get(child(ref(db), 'users/'+safeKey(myId)+'/rooms'));
+    const cloud = snap.exists() ? (snap.val()||{}) : {};
+    const byCode = {};
+    getMyRooms().forEach(r=> byCode[r.code] = r);
+    // 클라우드 → 로컬
+    Object.keys(cloud).forEach(codeKey=>{
+      const c = cloud[codeKey] || {};
+      const cur = byCode[codeKey] || {};
+      byCode[codeKey] = {
+        code: codeKey,
+        name: cur.name || c.name || '',
+        roomName: cur.roomName || c.roomName || '',
+        emoji: cur.emoji || c.emoji || '📍',
+        savedAt: cur.savedAt || c.savedAt || Date.now(),
+      };
+    });
+    // 로컬에만 있는 방은 클라우드에 백필
+    getMyRooms().forEach(r=>{
+      if(!cloud[r.code]){
+        try{ set(ref(db, 'users/'+safeKey(myId)+'/rooms/'+r.code), { name:r.name||'', roomName:r.roomName||'', emoji:r.emoji||'📍', savedAt:r.savedAt||Date.now() }); }catch(e){}
+      }
+    });
+    const merged = Object.values(byCode).sort((a,b)=> (b.savedAt||0)-(a.savedAt||0));
+    saveMyRooms(merged.slice(0, 30));
+  }catch(e){}
+}
 
 /* ================= utils ================= */
 const $ = (id)=> document.getElementById(id);
@@ -1396,8 +1435,9 @@ function showScreen(idOrNull){
 /* ================= my rooms home ================= */
 function goHomeOrLobby(){
   // 로그인/재진입 후에는 언제나 홈으로 (방이 없으면 홈의 빈 상태가 안내)
-  renderRoomList();
+  renderRoomList();               // 우선 로컬 캐시로 빠르게 표시
   showScreen('homeScreen');
+  syncRoomsFromCloud().then(()=> renderRoomList());  // 계정에 저장된 목록으로 갱신
 }
 
 /* ===== 정렬 (이름순 / 날짜순 / 직접) ===== */
